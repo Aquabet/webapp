@@ -1,4 +1,8 @@
-Flask==2.3.2
+Flask==2.3.0
 SQLAlchemy==2.0.21
 mysql-connector-python==8.1.0
 python-dotenv==1.0.0
+Flask-SQLAlchemy==3.0.5
+bcrypt==4.0.1
+pymysql==1.1.1
+cryptography==38.0.0
