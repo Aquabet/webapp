@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify, Response
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, DBAPIError
@@ -6,10 +7,15 @@ from auth import token_required
 import bcrypt
 import re
 from datetime import datetime
-from config import Config
+from config import Config, TestConfig
 
 app = Flask(__name__)
-app.config.from_object(Config)
+
+if os.getenv('FLASK_ENV') == 'testing' or os.getenv('PYTEST_CURRENT_TEST') == 'True':
+    app.config.from_object(TestConfig)
+else:
+    app.config.from_object(Config)
+
 db.init_app(app)
 
 # bootstrap database
@@ -54,11 +60,15 @@ EMAIL_REGEX = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 def create_user():
     data = request.get_json()
     email = data.get('email')
+    password = data.get('password')
 
     # no email
     if not email:
         return jsonify({'error': 'Email is required'}), 400
-    # not a email
+    # no password
+    if not password:
+        return jsonify({'error': 'Password is required'}), 400
+
     if not re.match(EMAIL_REGEX, email):
         return jsonify({'error': 'Invalid email address'}), 400
     
@@ -66,7 +76,7 @@ def create_user():
     if existing_user:
         return jsonify({'error': 'User already exists'}), 400
 
-    hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     new_user = User(
         email=email,
         password=hashed_password,
@@ -116,7 +126,10 @@ def update_user():
     if 'last_name' in data:
         user.last_name = data['last_name']
     if 'password' in data:
-        hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+        password = data['password']
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         user.password = hashed_password
 
     # update account_updated time
