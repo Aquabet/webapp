@@ -12,7 +12,10 @@ def token_required(f):
         user = User.query.filter_by(email=auth.username).first()
         if not user:
             return jsonify({'message': 'User not found'}), 404
-        if not bcrypt.checkpw(auth.password.encode('utf-8'), user.password.encode('utf-8')):
+        user_password = user.password
+        if(type(user_password) == str):
+            user_password = user_password.encode('utf-8')
+        if not bcrypt.checkpw(auth.password.encode('utf-8'), user_password):
             return jsonify({'message': 'Invalid credentials'}), 401
         return f(*args, **kwargs)
     return decorated
