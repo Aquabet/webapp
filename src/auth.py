@@ -1,6 +1,6 @@
 from functools import wraps
 from flask import request, jsonify
-from models import User
+from src.models import User
 import bcrypt
 
 def token_required(f):
