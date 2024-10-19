@@ -29,9 +29,9 @@ jobs:
       - name: Build application artifact
         run: |
           mkdir build
-          cp -r src app.py requirements.txt build/
+          cp -rf src app.py requirements.txt build/
           cd build
-          zip -r ../webapp.zip .
+          zip -rf ../webapp.zip .
           cd ..
 
       - name: Configure AWS Credentials
