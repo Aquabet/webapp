@@ -59,7 +59,7 @@ jobs:
 
       - name: Extract AMI ID from Packer Build Output
         run: |
-          AMI_ID=$(grep 'artifact,0,id' build.log | cut -d',' -f6 | cut -d':' -f2)
+          AMI_ID=$(grep -oP '(?<=us-west-2: )ami-[a-zA-Z0-9]+' build.log)
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
         id: get_ami_id
 
