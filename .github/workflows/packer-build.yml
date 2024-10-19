@@ -30,7 +30,9 @@ jobs:
         run: |
           mkdir build
           cp -rf src app.py requirements.txt build/
-          zip -r ./build/webapp.zip build/
+          cd build
+          zip -r webapp.zip ./src ./app.py ./requirements.txt
+          cd ../
           mv -f build/webapp.zip ./webapp.zip
 
       - name: Configure AWS Credentials
