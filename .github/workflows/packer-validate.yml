@@ -1,0 +1,30 @@
+name: Packer Validate Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  PRODUCT_VERSION: "1.11.2"
+
+jobs:
+  packer-validate:
+    name: "Check Packer Validate"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup packer
+        uses: hashicorp/setup-packer@main
+        id: setup
+        with:
+          version: ${{ env.PRODUCT_VERSION }}
+
+      - name: Run packer init
+        run: packer init ./aws.pkr.hcl
+
+      - name: Run packer Validate
+        run: packer validate ./aws.pkr.hcl

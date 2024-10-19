@@ -2,12 +2,12 @@ import os
 from flask import Flask, request, jsonify, Response
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, DBAPIError
-from models import db, User
-from auth import token_required
+from src.models import db, User
+from src.auth import token_required
 import bcrypt
 import re
 from datetime import datetime
-from config import Config, TestConfig
+from src.config import Config, TestConfig
 
 app = Flask(__name__)
 

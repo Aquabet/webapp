@@ -1,0 +1,27 @@
+name: Packer Format Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  PRODUCT_VERSION: "1.11.2"
+
+jobs:
+  packer-fmt:
+    name: 'Check Packer Format'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup packer
+        uses: hashicorp/setup-packer@main
+        id: setup
+        with:
+          version: ${{ env.PRODUCT_VERSION }}
+
+      - name: Run packer fmt
+        run: packer fmt -check .

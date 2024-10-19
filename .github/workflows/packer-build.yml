@@ -1,0 +1,57 @@
+name: Packer Build Custom Image
+
+on:
+  push:
+    branches:
+      - main
+env:
+  PRODUCT_VERSION: "1.11.2"
+
+jobs:
+  packer-build:
+    name: Build Packer Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies and run integration tests
+        env:
+          FLASK_ENV: testing
+          PYTEST_CURRENT_TEST: "True"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+          pytest --maxfail=5 --disable-warnings -v
+
+      - name: Build application artifact
+        run: |
+          mkdir build
+          cp -rf src app.py requirements.txt build/
+          cd build
+          zip -rf ../webapp.zip .
+          cd ..
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Setup packer
+        uses: hashicorp/setup-packer@main
+        id: setup
+        with:
+          version: ${{ env.PRODUCT_VERSION }}
+
+      - name: Packer Init
+        run: packer init ./aws.pkr.hcl
+
+      - name: Packer Validate
+        run: packer validate ./aws.pkr.hcl
+
+      - name: Packer Build
+        run: packer build ./aws.pkr.hcl

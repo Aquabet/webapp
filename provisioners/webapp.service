@@ -1,0 +1,19 @@
+[Unit]
+Description=webapp API
+ConditionPathExists=/opt/webapp/app.py
+After=network.target
+
+[Service]
+Type=simple
+User=csye6225
+Group=csye6225
+WorkingDirectory=/opt/webapp
+ExecStart=/opt/webapp/venv/bin/python3 /opt/webapp/app.py
+Restart=always
+RestartSec=3
+StandardOutput=syslog
+StandardError=syslog
+syslogIdentifier=webapp
+
+[Install]
+WantedBy=multi-user.target
