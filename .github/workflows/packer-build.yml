@@ -56,3 +56,17 @@ jobs:
 
       - name: Packer Build
         run: packer build ./aws.pkr.hcl
+
+      - name: Extract AMI ID from Packer Build Output
+        run: |
+          AMI_ID=$(grep 'artifact,0,id' build.log | cut -d',' -f6 | cut -d':' -f2)
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+        id: get_ami_id
+
+      - name: Share AMI with DEMO Account
+        run: |
+          aws ec2 modify-image-attribute \
+            --image-id ${{ env.AMI_ID }} \
+            --launch-permission "Add=[{UserId=${{ secrets.DEMO_ACCOUNT_ID }}}]"
+        env:
+          AWS_REGION: us-west-2

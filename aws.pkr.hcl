@@ -37,12 +37,17 @@ variable "security_group_id" {
   default = "sg-0d3b0376297fa6113"
 }
 
+variable "demo_account_id" {
+  type    = string
+  default = "345594606247"
+}
+
 source "amazon-ebs" "my-ami" {
   region          = var.aws_region
   ami_name        = "csye6225_${formatdate("YYYY_MM_DD_HH_mm", timestamp())}"
   ami_description = "CSYE6225 AMI"
   profile         = "dev"
-  ami_users       = []
+  ami_users       = [var.demo_account_id]
   ami_regions = [
     "us-west-2",
   ]
