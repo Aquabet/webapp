@@ -23,5 +23,8 @@ jobs:
         with:
           version: ${{ env.PRODUCT_VERSION }}
 
+      - name: Run packer init
+        run: packer init ./aws.pkr.hcl
+
       - name: Run packer Validate
-        run: packer validate .
+        run: packer validate ./aws.pkr.hcl
