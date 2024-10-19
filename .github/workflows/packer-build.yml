@@ -55,7 +55,7 @@ jobs:
         run: packer validate ./aws.pkr.hcl
 
       - name: Packer Build
-        run: packer build ./aws.pkr.hcl
+        run: packer build ./aws.pkr.hcl | tee build.log
 
       - name: Extract AMI ID from Packer Build Output
         run: |
