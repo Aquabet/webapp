@@ -2,15 +2,11 @@ packer {
   required_plugins {
     amazon = {
       version = ">= 1.0.0, < 2.0.0"
-      source  = "github.com/hashicorp/amazon"     
+      source  = "github.com/hashicorp/amazon"
     }
   }
 }
 
-variable "aws_region" {
-  type        = string
-  default = "us-west-2"
-}
 
 variable "source_ami" {
   type    = string
