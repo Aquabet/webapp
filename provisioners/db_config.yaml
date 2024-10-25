@@ -1,6 +1,0 @@
-database:
-  username: webapp
-  password: 123456
-  dbname: webapp
-  dbhost: localhost
-  dbport: 3306
