@@ -1,6 +1,6 @@
 [Unit]
 Description=webapp API
-ConditionPathExists=/opt/webapp/app.py
+ConditionPathExists=/opt/webapp/.env
 After=network.target
 
 [Service]
@@ -11,9 +11,8 @@ WorkingDirectory=/opt/webapp
 ExecStart=/opt/webapp/venv/bin/python3 /opt/webapp/app.py
 Restart=always
 RestartSec=3
-StandardOutput=syslog
-StandardError=syslog
-syslogIdentifier=webapp
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

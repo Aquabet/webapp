@@ -87,11 +87,6 @@ build {
     destination = "/tmp/webapp.service"
   }
 
-  provisioner "file" {
-    source      = "./provisioners/db_config.yaml"
-    destination = "/tmp/db_config.yaml"
-  }
-
   provisioner "shell" {
     script = "./provisioners/updateOs.sh"
   }
@@ -102,9 +97,5 @@ build {
 
   provisioner "shell" {
     script = "./provisioners/appSetup.sh"
-  }
-
-  provisioner "shell" {
-    script = "./provisioners/dbSetup.sh"
   }
 }
