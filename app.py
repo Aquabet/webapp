@@ -33,6 +33,21 @@ def initialize_database():
 
 initialize_database()
 
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    try:
+        db.session.remove()
+    except OperationalError:
+        pass
+
+@app.before_request
+def before_request():
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+
 def check_db_connection():
     try:
         db.session.execute(text('SELECT 1'))
