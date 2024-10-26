@@ -18,13 +18,37 @@ else:
 
 db.init_app(app)
 
+initialized = False
+
 # bootstrap database
-with app.app_context():
-    db.create_all()
+def initialize_database():
+    global initialized
+    if not initialized:
+        with app.app_context():
+            try:
+                db.create_all()
+                initialized = True
+            except (OperationalError, DBAPIError):
+                initialized = False
+
+initialize_database()
+
+def check_db_connection():
+    try:
+        db.session.execute(text('SELECT 1'))
+        return True
+    except (OperationalError, DBAPIError):
+        return False
 
 # health check
 @app.route('/healthz', methods=['GET'])
 def health_check():
+    # 503 Service Unavailable
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
     # 400 Bad Request
     if request.args or request.get_data(as_text=True):
         return Response(status=400, headers={
@@ -58,6 +82,14 @@ EMAIL_REGEX = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 # Creat user
 @app.route('/v1/user', methods=['POST'])
 def create_user():
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    if not initialized:
+        initialize_database()
+
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -91,6 +123,14 @@ def create_user():
 @app.route('/v1/user/self', methods=['GET'])
 @token_required
 def get_user_info():
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    if not initialized:
+        initialize_database()
+
     auth = request.authorization
     user = User.query.filter_by(email=auth.username).first()
     if not user:
@@ -108,6 +148,14 @@ def get_user_info():
 @app.route('/v1/user/self', methods=['PUT'])
 @token_required
 def update_user():
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    if not initialized:
+        initialize_database()
+
     data = request.get_json()
     auth = request.authorization
 
