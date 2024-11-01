@@ -42,19 +42,62 @@ variable "demo_account_id" {
   default = "345594606247"
 }
 
+variable "device_name" {
+  type    = string
+  default = "/dev/sda1"
+}
+
+variable "ami_name" {
+  type    = string
+  default = "csye6225_${formatdate("YYYY_MM_DD_HH_mm", timestamp())}"
+}
+
+variable "ami_description" {
+  type    = string
+  default = "CSYE6225 AMI"
+}
+
+variable "ami_regions" {
+  type    = list(string)
+  default = ["us-west-2"]
+}
+
+variable "profile" {
+  type    = string
+  default = "dev"
+}
+
+variable "delay_seconds" {
+  type    = number
+  default = 120
+}
+
+variable "max_attempts" {
+  type    = number
+  default = 50
+}
+
+variable "volume_size" {
+  type    = number
+  default = 8
+}
+
+variable "volume_type" {
+  type    = string
+  default = "gp2"
+}
+
 source "amazon-ebs" "my-ami" {
   region          = var.aws_region
-  ami_name        = "csye6225_${formatdate("YYYY_MM_DD_HH_mm", timestamp())}"
-  ami_description = "CSYE6225 AMI"
-  profile         = "dev"
+  ami_name        = var.ami_name
+  ami_description = var.ami_description
+  profile         = var.profile
   ami_users       = [var.demo_account_id]
-  ami_regions = [
-    "us-west-2",
-  ]
+  ami_regions     = var.ami_regions
 
   aws_polling {
-    delay_seconds = 120
-    max_attempts  = 50
+    delay_seconds = var.delay_seconds
+    max_attempts  = var.max_attempts
   }
 
   instance_type     = var.instance_type
@@ -66,9 +109,9 @@ source "amazon-ebs" "my-ami" {
 
   launch_block_device_mappings {
     delete_on_termination = true
-    device_name           = "/dev/sda1"
-    volume_size           = 8
-    volume_type           = "gp2"
+    device_name           = var.device_name
+    volume_size           = var.volume_size
+    volume_type           = var.volume_type
   }
 }
 
