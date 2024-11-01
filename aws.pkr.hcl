@@ -47,11 +47,6 @@ variable "device_name" {
   default = "/dev/sda1"
 }
 
-variable "ami_name" {
-  type    = string
-  default = "csye6225_${formatdate("YYYY_MM_DD_HH_mm", timestamp())}"
-}
-
 variable "ami_description" {
   type    = string
   default = "CSYE6225 AMI"
@@ -89,7 +84,7 @@ variable "volume_type" {
 
 source "amazon-ebs" "my-ami" {
   region          = var.aws_region
-  ami_name        = var.ami_name
+  ami_name        = "csye6225_${formatdate("YYYY_MM_DD_HH_mm", timestamp())}"
   ami_description = var.ami_description
   profile         = var.profile
   ami_users       = [var.demo_account_id]
