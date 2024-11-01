@@ -6,10 +6,6 @@ sudo unzip /tmp/webapp.zip -d /opt/webapp
 
 sudo cp /tmp/webapp.service /etc/systemd/system/webapp.service
 
-sudo chown -R csye6225:csye6225 /etc/systemd/system/webapp.service
-
-sudo chmod 664 /etc/systemd/system/webapp.service
-
 sudo systemctl daemon-reload
 
 sudo systemctl enable webapp.service
