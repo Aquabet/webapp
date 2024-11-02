@@ -2,7 +2,13 @@
 
 set -e
 
-sudo apt-get install -y amazon-cloudwatch-agent
+# sudo apt-get install -y amazon-cloudwatch-agent
+
+sudo wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+
+rm ./amazon-cloudwatch-agent.deb
 
 sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
 
