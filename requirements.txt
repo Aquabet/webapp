@@ -9,3 +9,4 @@ cryptography==38.0.0
 werkzeug==3.0.4
 boto3==1.35.54
 statsd==4.0.1
+sendgrid==6.11.0
