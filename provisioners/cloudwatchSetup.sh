@@ -26,11 +26,13 @@ cat <<EOF | sudo tee "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-age
   },
   "logs": {
     "logs_collected": {
-      "journal": {
+      "files": {
         "collect_list": [
           {
-            "journal_name": "webapp.service",
-            "log_group_name": "webapp/logs"
+            "file_path": "/opt/webapp/logs/application.log",
+            "log_group_name": "Webapp_ApplicationLog",
+            "log_stream_name": "webapp_application_log",
+            "timestamp_format": "%Y-%m-%d %H:%M:%S"
           }
         ]
       }
