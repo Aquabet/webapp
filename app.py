@@ -6,12 +6,21 @@ from sqlalchemy.exc import OperationalError, DBAPIError
 from src.metrics import log_api_call_count, log_api_call_duration
 from src.models import db, User
 from src.auth import token_required
+from src.send_email import send_email
 import bcrypt
 import re
 from datetime import datetime
 from src.config import Config, TestConfig
 import time
 import boto3
+import logging
+
+logging.basicConfig(
+    filename='application.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
 
 app = Flask(__name__)
 
@@ -64,6 +73,11 @@ def check_db_connection():
 def health_check():
     # 503 Service Unavailable
     if not check_db_connection():
+        send_email(
+            to_email='jiaxianli57@gmail.com',
+            subject='Health Check Failed',
+            content='Database connection failed in health check.'
+        )
         return Response(status=503, headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -77,6 +91,11 @@ def health_check():
     try:
         # 200 OK
         db.session.execute(text('SELECT 1'))
+        send_email(
+            to_email='jiaxianli57@gmail.com',
+            subject='Health Check Passed',
+            content='Database connection ok in health check.'
+        )
         return Response(status=200, headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -232,16 +251,22 @@ def update_user():
 s3_client = boto3.client("s3", region_name="us-west-2")
 
 def upload_file_to_s3(file, bucket_name, object_name):
+    start_time = time.time()
     try:
         s3_client.upload_fileobj(file, bucket_name, object_name)
+        time_elapsed = (time.time() - start_time) * 1000
+        log_api_call_duration("S3Upload", time_elapsed)
         return True
     except Exception as e:
         print(e)
         return False
     
 def delete_file_from_s3(bucket_name, object_name):
+    start_time = time.time()
     try:
         s3_client.delete_object(Bucket=bucket_name, Key=object_name)
+        time_elapsed = (time.time() - start_time) * 1000
+        log_api_call_duration("S3Delete", time_elapsed)
         return True
     except Exception as e:
         print(e)
@@ -268,7 +293,10 @@ def upload_profile_pic():
     if upload_file_to_s3(file, bucket_name, file_name):
         user.profile_pic = file_name
         user.profile_pic_upload_date = datetime.now()
+        db_start_time = time.time()
         db.session.commit()
+        db_time_elapsed = (time.time() - db_start_time) * 1000
+        log_api_call_duration("UploadProfilePicDB", db_time_elapsed)
         time_elapsed = (time.time() - start_time) * 1000
         log_api_call_duration("UploadProfilePic", time_elapsed)
 
@@ -334,7 +362,10 @@ def delete_profile_pic():
     if delete_file_from_s3(bucket_name, user.profile_pic):
         user.profile_pic = None
         user.profile_pic_upload_date = None
+        db_start_time = time.time()
         db.session.commit()
+        db_time_elapsed = (time.time() - db_start_time) * 1000
+        log_api_call_duration("DeleteProfilePicDB", db_time_elapsed)
         time_elapsed = (time.time() - start_time) * 1000
         log_api_call_duration("DeleteProfilePic", time_elapsed)
         return Response(status=204)
