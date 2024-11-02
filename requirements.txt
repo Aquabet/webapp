@@ -7,3 +7,5 @@ bcrypt==4.0.1
 pymysql==1.1.1
 cryptography==38.0.0
 werkzeug==3.0.4
+boto3==1.35.54
+statsd==4.0.1

@@ -136,4 +136,7 @@ build {
   provisioner "shell" {
     script = "./provisioners/appSetup.sh"
   }
+  provisioner "shell" {
+    script = "./provisioners/cloudwatchSetup.sh"
+  }
 }
