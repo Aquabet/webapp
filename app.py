@@ -15,7 +15,7 @@ import boto3
 import logging
 
 logging.basicConfig(
-    filename='/var/log/application.log',
+    filename='/var/log/webapp.log',
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
