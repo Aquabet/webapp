@@ -14,6 +14,10 @@ import time
 import boto3
 import logging
 
+import werkzeug
+werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
+werkzeug.serving.WSGIRequestHandler.disable_nagle_algorithm = True
+
 logging.basicConfig(
     filename='/var/log/webapp.log',
     level=logging.INFO,
@@ -69,6 +73,7 @@ def check_db_connection():
 # health check
 @app.route('/healthz', methods=['GET'])
 def health_check():
+    log_api_call_count("HealthCheck")
     start_time = time.time()
     # 503 Service Unavailable
     if not check_db_connection():
@@ -289,7 +294,7 @@ def upload_profile_pic():
 
     existing_image = Image.query.filter_by(user_id=user.id).first()
     if existing_image:
-        if not delete_file_from_s3(bucket_name, existing_image.url.split('/')[-1]):
+        if not delete_file_from_s3(bucket_name, f"{user.id}/{existing_image.url.split('/')[-1]}"):
             return jsonify({'error': 'Failed to delete existing profile picture'}), 500
         db.session.delete(existing_image)
 
@@ -365,7 +370,7 @@ def delete_profile_pic():
         return jsonify({'error': 'Profile picture not found'}), 404
 
     bucket_name = app.config['S3_BUCKET_NAME']
-    if delete_file_from_s3(bucket_name, image.url.split('/')[-1]):
+    if delete_file_from_s3(bucket_name, f"{user.id}/{image.url.split('/')[-1]}"):
         db.session.delete(image)
         
         db_start_time = time.time()
