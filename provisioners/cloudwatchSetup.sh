@@ -46,3 +46,9 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
     -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 
 sudo systemctl enable amazon-cloudwatch-agent
+
+sudo touch /var/log/webapp.log
+
+sudo chown csye6225:csye6225 /var/log/webapp.log
+
+sudo chmod 664 /var/log/webapp.log
