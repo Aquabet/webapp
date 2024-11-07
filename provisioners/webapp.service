@@ -11,8 +11,8 @@ WorkingDirectory=/opt/webapp
 ExecStart=/opt/webapp/venv/bin/python3 /opt/webapp/app.py
 Restart=always
 RestartSec=3
-StandardOutput=append:/var/log/webapp.log
-StandardError=append:/var/log/webapp.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
