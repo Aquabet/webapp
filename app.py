@@ -4,9 +4,8 @@ from flask import Flask, request, jsonify, Response
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, DBAPIError
 from src.metrics import log_api_call_count, log_api_call_duration
-from src.models import db, User
+from src.models import db, User, Image
 from src.auth import token_required
-from src.send_email import send_email
 import bcrypt
 import re
 from datetime import datetime
@@ -16,11 +15,10 @@ import boto3
 import logging
 
 logging.basicConfig(
-    filename='application.log',
+    filename='/var/log/application.log',
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
 
 app = Flask(__name__)
 
@@ -71,13 +69,9 @@ def check_db_connection():
 # health check
 @app.route('/healthz', methods=['GET'])
 def health_check():
+    start_time = time.time()
     # 503 Service Unavailable
     if not check_db_connection():
-        send_email(
-            to_email='jiaxianli57@gmail.com',
-            subject='Health Check Failed',
-            content='Database connection failed in health check.'
-        )
         return Response(status=503, headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -91,11 +85,8 @@ def health_check():
     try:
         # 200 OK
         db.session.execute(text('SELECT 1'))
-        send_email(
-            to_email='jiaxianli57@gmail.com',
-            subject='Health Check Passed',
-            content='Database connection ok in health check.'
-        )
+        time_elapsed = (time.time() - start_time) * 1000
+        log_api_call_duration("HealthCheck", time_elapsed)
         return Response(status=200, headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
@@ -110,14 +101,14 @@ def health_check():
 @app.errorhandler(405)
 def method_not_allowed(e):
     # 405 Method Not Allowed
-        return Response(status=405, headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-        })
+    return Response(status=405, headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    })
 
 EMAIL_REGEX = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 
-# Creat user
+# Create user
 @app.route('/v1/user', methods=['POST'])
 def create_user():
     log_api_call_count("CreateUser")
@@ -150,6 +141,7 @@ def create_user():
 
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     new_user = User(
+        id=str(uuid.uuid4()),
         email=email,
         password=hashed_password,
         first_name=data['first_name'],
@@ -164,7 +156,8 @@ def create_user():
 
     time_elapsed = (time.time() - start_time) * 1000
     log_api_call_duration("CreateUser", time_elapsed)
-    return jsonify({'message': 'User created successfully'}), 201
+    return jsonify({'message': 'User created successfully', 'user_id': new_user.id}), 201
+
 
 # get user info
 @app.route('/v1/user/self', methods=['GET'])
@@ -185,6 +178,7 @@ def get_user_info():
     user = User.query.filter_by(email=auth.username).first()
     db_time_elapsed = (time.time() - db_start_time) * 1000
     log_api_call_duration("GetUserInfoDB", db_time_elapsed)
+
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
@@ -195,8 +189,10 @@ def get_user_info():
         'first_name': user.first_name,
         'last_name': user.last_name,
         'account_created': user.account_created,
-        'account_updated': user.account_updated
+        'account_updated': user.account_updated,
+        'user_id': user.id
     }), 200
+
 
 # update user info
 @app.route('/v1/user/self', methods=['PUT'])
@@ -225,6 +221,7 @@ def update_user():
         if key not in allowed_updates:
             return jsonify({'error': f'Field {key} cannot be updated'}), 400
 
+    # Update fields
     if 'first_name' in data:
         user.first_name = data['first_name']
     if 'last_name' in data:
@@ -236,8 +233,8 @@ def update_user():
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         user.password = hashed_password
 
-    # update account_updated time
-    user.account_updated = datetime.now(datetime.timezone.utc)
+    # Update account_updated time
+    user.account_updated = datetime.now()
     db_start_time = time.time()
     db.session.commit()
     db_time_elapsed = (time.time() - db_start_time) * 1000
@@ -290,22 +287,35 @@ def upload_profile_pic():
     file_name = f"{user.id}/{uuid.uuid4()}.{file.filename.split('.')[-1]}"
     bucket_name = app.config['S3_BUCKET_NAME']
 
+    existing_image = Image.query.filter_by(user_id=user.id).first()
+    if existing_image:
+        if not delete_file_from_s3(bucket_name, existing_image.url.split('/')[-1]):
+            return jsonify({'error': 'Failed to delete existing profile picture'}), 500
+        db.session.delete(existing_image)
+
     if upload_file_to_s3(file, bucket_name, file_name):
-        user.profile_pic = file_name
-        user.profile_pic_upload_date = datetime.now()
+        new_image = Image(
+            file_name=file.filename,
+            url=f"{bucket_name}/{file_name}",
+            user_id=user.id,
+            upload_date=datetime.now()
+        )
+        db.session.add(new_image)
+        
         db_start_time = time.time()
         db.session.commit()
         db_time_elapsed = (time.time() - db_start_time) * 1000
         log_api_call_duration("UploadProfilePicDB", db_time_elapsed)
+        
         time_elapsed = (time.time() - start_time) * 1000
         log_api_call_duration("UploadProfilePic", time_elapsed)
 
         return jsonify({
-            "file_name": file.filename,
-            "id": str(user.id),
-            "url": f"{bucket_name}/{file_name}",
-            "upload_date": user.profile_pic_upload_date.strftime("%Y-%m-%d"),
-            "user_id": str(user.id)
+            "file_name": new_image.file_name,
+            "id": new_image.id,
+            "url": new_image.url,
+            "upload_date": new_image.upload_date.strftime("%Y-%m-%d"),
+            "user_id": new_image.user_id
         }), 201
     else:
         return jsonify({'error': 'File upload failed'}), 500
@@ -323,22 +333,21 @@ def get_profile_pic():
         log_api_call_duration("GetProfilePic", time_elapsed)
         return jsonify({'error': 'User not found'}), 404
 
-    if not user.profile_pic:
+    image = Image.query.filter_by(user_id=user.id).first()
+    if not image:
         time_elapsed = (time.time() - start_time) * 1000
         log_api_call_duration("GetProfilePic", time_elapsed)
         return jsonify({'error': 'Profile picture not found'}), 404
 
-    bucket_name = app.config['S3_BUCKET_NAME']
     time_elapsed = (time.time() - start_time) * 1000
     log_api_call_duration("GetProfilePic", time_elapsed)
     return jsonify({
-        "file_name": user.profile_pic.split('/')[-1],
-        "id": str(user.id),
-        "url": f"{bucket_name}/{user.profile_pic}",
-        "upload_date": user.profile_pic_upload_date.strftime("%Y-%m-%d"),
-        "user_id": str(user.id)
+        "file_name": image.file_name,
+        "id": image.id,
+        "url": image.url,
+        "upload_date": image.upload_date.strftime("%Y-%m-%d"),
+        "user_id": image.user_id
     }), 200
-
 
 @app.route('/v1/user/self/pic', methods=['DELETE'])
 @token_required
@@ -349,29 +358,26 @@ def delete_profile_pic():
     user = User.query.filter_by(email=auth.username).first()
     
     if not user:
-        time_elapsed = (time.time() - start_time) * 1000
-        log_api_call_duration("DeleteProfilePic", time_elapsed)
         return jsonify({'error': 'User not found'}), 404
 
-    if not user.profile_pic:
-        time_elapsed = (time.time() - start_time) * 1000
-        log_api_call_duration("DeleteProfilePic", time_elapsed)
+    image = Image.query.filter_by(user_id=user.id).first()
+    if not image:
         return jsonify({'error': 'Profile picture not found'}), 404
 
     bucket_name = app.config['S3_BUCKET_NAME']
-    if delete_file_from_s3(bucket_name, user.profile_pic):
-        user.profile_pic = None
-        user.profile_pic_upload_date = None
+    if delete_file_from_s3(bucket_name, image.url.split('/')[-1]):
+        db.session.delete(image)
+        
         db_start_time = time.time()
         db.session.commit()
         db_time_elapsed = (time.time() - db_start_time) * 1000
         log_api_call_duration("DeleteProfilePicDB", db_time_elapsed)
+
         time_elapsed = (time.time() - start_time) * 1000
         log_api_call_duration("DeleteProfilePic", time_elapsed)
+
         return Response(status=204)
     else:
-        time_elapsed = (time.time() - start_time) * 1000
-        log_api_call_duration("DeleteProfilePic", time_elapsed)
         return jsonify({'error': 'File deletion failed'}), 500
 
 if __name__ == '__main__':
