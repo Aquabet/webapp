@@ -1,15 +1,16 @@
 import os
 import uuid
 from flask import Flask, request, jsonify, Response
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, DBAPIError
 from src.metrics import log_api_call_count, log_api_call_duration
 from src.models import db, User, Image
 from src.auth import token_required
 import bcrypt
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.config import Config, TestConfig
+from src.sns_operations import send_verification_email
 import time
 import boto3
 import logging
@@ -142,15 +143,38 @@ def create_user():
     
     existing_user = User.query.filter_by(email=email).first()
     if existing_user:
-        return jsonify({'error': 'User already exists'}), 400
+        if existing_user.is_verified == "True":
+            return jsonify({'error': 'User already exists'}), 400
+        else:
+            # regist but not verified, resend verification email
+            verification_token = str(uuid.uuid4())
+            token_expiration = datetime.now() + timedelta(minutes=2)
+            existing_user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            existing_user.verification_token = verification_token
+            existing_user.token_expiration = token_expiration
 
+            db_start_time = time.time()
+            db.session.commit()
+            db_time_elapsed = (time.time() - db_start_time) * 1000
+            log_api_call_duration("CreateUserDB", db_time_elapsed)
+
+            send_verification_email(email, verification_token)
+            time_elapsed = (time.time() - start_time) * 1000
+            log_api_call_duration("CreateUser", time_elapsed)
+            return jsonify({'message': 'Verification email resent. Please check your email.'}), 200
+
+    # send verification email for new user
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    verification_token = str(uuid.uuid4())
+    token_expiration = datetime.now() + timedelta(minutes=2)
     new_user = User(
         id=str(uuid.uuid4()),
         email=email,
         password=hashed_password,
         first_name=data['first_name'],
-        last_name=data['last_name']
+        last_name=data['last_name'],
+        verification_token=verification_token,
+        token_expiration=token_expiration,
     )
     db.session.add(new_user)
 
@@ -159,9 +183,10 @@ def create_user():
     db_time_elapsed = (time.time() - db_start_time) * 1000
     log_api_call_duration("CreateUserDB", db_time_elapsed)
 
+    send_verification_email(email, verification_token)
     time_elapsed = (time.time() - start_time) * 1000
     log_api_call_duration("CreateUser", time_elapsed)
-    return jsonify({'message': 'User created successfully', 'user_id': new_user.id}), 201
+    return jsonify({'message': 'User created successfully. Please verify your email.', 'user_id': new_user.id}), 201
 
 
 # get user info
@@ -384,6 +409,27 @@ def delete_profile_pic():
         return Response(status=204)
     else:
         return jsonify({'error': 'File deletion failed'}), 500
+
+@app.route('/v1/user/verify', methods=['GET'])
+def verify_user():
+    token = request.args.get('token')
+    if not token:
+        return jsonify({'error': 'Verification token is required'}), 400
+
+    user = User.query.filter_by(verification_token=token).first()
+    if not user:
+        return jsonify({'error': 'Invalid verification token'}), 400
+
+    if user.token_expiration < datetime.now():
+        return jsonify({'error': 'Verification token expired. Please register again.'}), 400
+
+    user.is_verified = "True"
+    user.verification_token = None
+    user.token_expiration = None
+    db.session.commit()
+
+    return jsonify({'message': 'Email successfully verified.'}), 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
