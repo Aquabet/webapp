@@ -211,6 +211,8 @@ def get_user_info():
 
     if not user:
         return jsonify({'error': 'User not found'}), 404
+    if user.is_verified == "False":
+        return jsonify({'error': 'User not verified'}), 403
     
     time_elapsed = (time.time() - start_time) * 1000
     log_api_call_duration("GetUserInfo", time_elapsed)
@@ -244,6 +246,8 @@ def update_user():
     user = User.query.filter_by(email=auth.username).first()
     if not user:
         return jsonify({'error': 'User not found'}), 404
+    if user.is_verified == "False":
+        return jsonify({'error': 'User not verified'}), 403
 
     # allowed fields
     allowed_updates = {'first_name', 'last_name', 'password'}
@@ -309,6 +313,8 @@ def upload_profile_pic():
     
     if not user:
         return jsonify({'error': 'User not found'}), 404
+    if user.is_verified == "False":
+        return jsonify({'error': 'User not verified'}), 403
 
     if 'profilePic' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -359,9 +365,9 @@ def get_profile_pic():
     user = User.query.filter_by(email=auth.username).first()
     
     if not user:
-        time_elapsed = (time.time() - start_time) * 1000
-        log_api_call_duration("GetProfilePic", time_elapsed)
         return jsonify({'error': 'User not found'}), 404
+    if user.is_verified == "False":
+        return jsonify({'error': 'User not verified'}), 403
 
     image = Image.query.filter_by(user_id=user.id).first()
     if not image:
@@ -389,6 +395,8 @@ def delete_profile_pic():
     
     if not user:
         return jsonify({'error': 'User not found'}), 404
+    if user.is_verified == "False":
+        return jsonify({'error': 'User not verified'}), 403
 
     image = Image.query.filter_by(user_id=user.id).first()
     if not image:
