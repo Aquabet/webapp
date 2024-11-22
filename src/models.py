@@ -17,6 +17,10 @@ class User(db.Model):
     account_created = Column(DateTime, default=datetime.now())
     account_updated = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
 
+    is_verified = Column(String(5), nullable=False, default="False")
+    verification_token = Column(String(255), nullable=True)
+    token_expiration = Column(DateTime, nullable=True)
+
 class Image(db.Model):
     __tablename__ = 'images'
 
