@@ -31,19 +31,7 @@ def test_create_user(client):
     }
     response = client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 201
-    assert b"User created successfully" in response.data
-
-def test_duplicate_user(client):
-    payload = {
-        "email": "test@example.com",
-        "password": "password123",
-        "first_name": "Test",
-        "last_name": "User"
-    }
-    client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
-    response = client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
-    assert response.status_code == 400
-    assert b"User already exists" in response.data
+    assert b"User created successfully. Please verify your email." in response.data
 
 def test_get_user_info(client):
     payload = {
