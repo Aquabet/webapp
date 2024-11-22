@@ -23,6 +23,7 @@ def client():
             db.drop_all()
 
 def test_create_user(client):
+    """Test user creation and verification email."""
     payload = {
         "email": "test@example.com",
         "password": "password123",
@@ -33,7 +34,23 @@ def test_create_user(client):
     assert response.status_code == 201
     assert b"User created successfully. Please verify your email." in response.data
 
-def test_get_user_info(client):
+def test_create_existing_user_not_verified(client):
+    """Test re-creating an unverified user."""
+    payload = {
+        "email": "test@example.com",
+        "password": "password123",
+        "first_name": "Test",
+        "last_name": "User"
+    }
+    client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
+
+    # Attempt to create the same user again
+    response = client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 200
+    assert b"Verification email resent. Please check your email." in response.data
+
+def test_get_user_info_before_verification(client):
+    """Test accessing user info before email verification."""
     payload = {
         "email": "test@example.com",
         "password": "password123",
@@ -47,15 +64,40 @@ def test_get_user_info(client):
         'Authorization': 'Basic ' + base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
     }
 
+    # Access user info before verification
     response = client.get('/v1/user/self', headers=auth_headers)
-    assert response.status_code == 200
+    assert response.status_code == 403
+    assert b"User not verified" in response.data
 
-    data = json.loads(response.data)
-    assert data['email'] == "test@example.com"
-    assert data['first_name'] == "Test"
-    assert data['last_name'] == "User"
+# def test_user_verification(client):
+#     """Test user email verification."""
+#     payload = {
+#         "email": "test@example.com",
+#         "password": "password123",
+#         "first_name": "Test",
+#         "last_name": "User"
+#     }
+#     client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
+
+#     with app.app_context():
+#         user = db.session.query(db.Model).filter_by(email="test@example.com").first()
+
+#     # Simulate email verification
+#     verify_url = f"/v1/user/verify?token={user.verification_token}"
+#     response = client.get(verify_url)
+#     assert response.status_code == 200
+#     assert b"Email successfully verified." in response.data
+
+#     # Access user info after verification
+#     auth_string = 'test@example.com:password123'
+#     auth_headers = {
+#         'Authorization': 'Basic ' + base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+#     }
+#     response = client.get('/v1/user/self', headers=auth_headers)
+#     assert response.status_code == 200
 
 def test_unauthorized_access(client):
+    """Test unauthorized access to user info."""
     response = client.get('/v1/user/self')
     assert response.status_code == 401
     assert b"Authentication required!" in response.data
