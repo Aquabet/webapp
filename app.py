@@ -15,9 +15,7 @@ import time
 import boto3
 import logging
 
-import werkzeug
-werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
-werkzeug.serving.WSGIRequestHandler.disable_nagle_algorithm = True
+os.environ['CLICOLOR'] = '0'
 
 logging.basicConfig(
     filename='/var/log/webapp.log',

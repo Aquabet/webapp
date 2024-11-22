@@ -10,6 +10,7 @@ import base64
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import app, db
+from src.models import User
 
 @pytest.fixture
 def client():
@@ -44,7 +45,6 @@ def test_create_existing_user_not_verified(client):
     }
     client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
 
-    # Attempt to create the same user again
     response = client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
     assert response.status_code == 200
     assert b"Verification email resent. Please check your email." in response.data
@@ -64,37 +64,44 @@ def test_get_user_info_before_verification(client):
         'Authorization': 'Basic ' + base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
     }
 
-    # Access user info before verification
     response = client.get('/v1/user/self', headers=auth_headers)
     assert response.status_code == 403
     assert b"User not verified" in response.data
 
-# def test_user_verification(client):
-#     """Test user email verification."""
-#     payload = {
-#         "email": "test@example.com",
-#         "password": "password123",
-#         "first_name": "Test",
-#         "last_name": "User"
-#     }
-#     client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
+def test_user_verification(client):
+    """Test user email verification."""
+    payload = {
+        "email": "test@example.com",
+        "password": "password123",
+        "first_name": "Test",
+        "last_name": "User"
+    }
+    response = client.post('/v1/user', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 201
+    assert b"User created successfully" in response.data
 
-#     with app.app_context():
-#         user = db.session.query(db.Model).filter_by(email="test@example.com").first()
+    with app.app_context():
+        user = db.session.query(User).filter_by(email="test@example.com").first()
+        assert user is not None, "User was not saved to the database."
+        assert user.verification_token is not None, "Verification token was not generated."
 
-#     # Simulate email verification
-#     verify_url = f"/v1/user/verify?token={user.verification_token}"
-#     response = client.get(verify_url)
-#     assert response.status_code == 200
-#     assert b"Email successfully verified." in response.data
+    verify_url = f"/v1/user/verify?token={user.verification_token}"
+    response = client.get(verify_url)
+    assert response.status_code == 200
+    assert b"Email successfully verified." in response.data
 
-#     # Access user info after verification
-#     auth_string = 'test@example.com:password123'
-#     auth_headers = {
-#         'Authorization': 'Basic ' + base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-#     }
-#     response = client.get('/v1/user/self', headers=auth_headers)
-#     assert response.status_code == 200
+    auth_string = 'test@example.com:password123'
+    auth_headers = {
+        'Authorization': 'Basic ' + base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+    }
+    response = client.get('/v1/user/self', headers=auth_headers)
+    assert response.status_code == 200
+
+    data = json.loads(response.data)
+    assert data["email"] == "test@example.com"
+    assert data["first_name"] == "Test"
+    assert data["last_name"] == "User"
+
 
 def test_unauthorized_access(client):
     """Test unauthorized access to user info."""
