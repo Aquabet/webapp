@@ -35,6 +35,9 @@ jobs:
           cd ../
           mv -f build/webapp.zip ./webapp.zip
 
+      - name: Install jq
+        run: sudo apt-get install jq
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -61,6 +64,7 @@ jobs:
         run: |
           AMI_ID=$(grep -oP '(?<=us-west-2: )ami-[a-zA-Z0-9]+' build.log)
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+          echo "AMI_ID=$AMI_ID"
         id: get_ami_id
 
       - name: Share AMI with DEMO Account
@@ -70,3 +74,48 @@ jobs:
             --launch-permission "Add=[{UserId=${{ secrets.DEMO_ACCOUNT_ID }}}]"
         env:
           AWS_REGION: us-west-2
+
+      - name: Configure AWS Credentials (Demo Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.DEMO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.DEMO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Update Launch Template
+        run: |
+          aws ec2 create-launch-template-version \
+            --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
+            --source-version $LATEST \
+            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}" \
+            | tee launch_template_update.log
+          NEW_VERSION=$(jq -r '.LaunchTemplateVersion.VersionNumber' launch_template_update.log)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Trigger Auto Scaling Group Instance Refresh
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name ${{ secrets.AUTOSCALING_GROUP_NAME }} \
+            --preferences "{\"MinHealthyPercentage\": 90}" \
+            | tee instance_refresh.log
+          REFRESH_ID=$(jq -r '.InstanceRefreshId' instance_refresh.log)
+          echo "REFRESH_ID=$REFRESH_ID" >> $GITHUB_ENV
+
+      - name: Monitor Instance Refresh
+        run: |
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name ${{ secrets.AUTOSCALING_GROUP_NAME }} \
+              --instance-refresh-ids ${{ env.REFRESH_ID }} \
+              | jq -r '.InstanceRefreshes[0].Status')
+            if [[ "$STATUS" == "Successful" ]]; then
+              echo "Instance refresh completed successfully."
+              break
+            elif [[ "$STATUS" == "Failed" ]]; then
+              echo "Instance refresh failed."
+              exit 1
+            else
+              echo "Waiting for instance refresh to complete. Current status: $STATUS"
+              sleep 30
+            fi
+          done
