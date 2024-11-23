@@ -35,9 +35,6 @@ jobs:
           cd ../
           mv -f build/webapp.zip ./webapp.zip
 
-      - name: Install jq
-        run: sudo apt-get install jq
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -84,9 +81,33 @@ jobs:
 
       - name: Update Launch Template
         run: |
+          LATEST_VERSION=$(aws ec2 describe-launch-template-versions \
+            --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
+            --query 'LaunchTemplateVersions[-1].VersionNumber' \
+            --output text)
+
+          aws ec2 describe-launch-template-versions \
+            --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
+            --versions $LATEST_VERSION \
+            --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
+            > original_launch_template_data.json
+
+          cat original_launch_template_data.json | \
+          jq --arg IMAGE_ID "${{ env.AMI_ID }}" '.ImageId = $IMAGE_ID' \
+          > new_launch_template_data.json
+
           aws ec2 create-launch-template-version \
             --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
-            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}"
+            --source-version $LATEST_VERSION \
+            --launch-template-data file://new_launch_template_data.json \
+            | tee launch_template_update.log
+
+          NEW_VERSION=$(jq -r '.LaunchTemplateVersion.VersionNumber' launch_template_update.log)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+          aws ec2 modify-launch-template \
+            --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
+            --default-version $NEW_VERSION
 
       - name: Trigger Auto Scaling Group Instance Refresh
         run: |
