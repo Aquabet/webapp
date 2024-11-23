@@ -86,11 +86,7 @@ jobs:
         run: |
           aws ec2 create-launch-template-version \
             --launch-template-id ${{ secrets.LAUNCH_TEMPLATE_ID }} \
-            --source-version $LATEST \
-            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}" \
-            | tee launch_template_update.log
-          NEW_VERSION=$(jq -r '.LaunchTemplateVersion.VersionNumber' launch_template_update.log)
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+            --launch-template-data "{\"ImageId\":\"${{ env.AMI_ID }}\"}"
 
       - name: Trigger Auto Scaling Group Instance Refresh
         run: |
