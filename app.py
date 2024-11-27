@@ -104,7 +104,7 @@ def health_check():
     
 # health check
 @app.route('/cicd', methods=['GET'])
-def health_check():
+def health_check2():
     log_api_call_count("HealthCheck")
     start_time = time.time()
     # 503 Service Unavailable
