@@ -101,7 +101,40 @@ def health_check():
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
         })
-
+    
+# health check
+@app.route('/cicd', methods=['GET'])
+def health_check():
+    log_api_call_count("HealthCheck")
+    start_time = time.time()
+    # 503 Service Unavailable
+    if not check_db_connection():
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    # 400 Bad Request
+    if request.args or request.get_data(as_text=True):
+        return Response(status=400, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    try:
+        # 200 OK
+        db.session.execute(text('SELECT 1'))
+        time_elapsed = (time.time() - start_time) * 1000
+        log_api_call_duration("HealthCheck", time_elapsed)
+        return Response(status=200, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    except (OperationalError, DBAPIError) as e:
+        # 503 Service Unavailable
+        return Response(status=503, headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+        })
+    
 @app.errorhandler(405)
 def method_not_allowed(e):
     # 405 Method Not Allowed
