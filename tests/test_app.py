@@ -1,11 +1,13 @@
 import os
 os.environ['FLASK_ENV'] = 'testing'
 os.environ['PYTEST_CURRENT_TEST'] = 'True'
+os.environ['AWS_REGION'] = 'us-west-2'
 
 import sys
 import pytest
 import json
 import base64
+from unittest.mock import patch, MagicMock
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -22,6 +24,14 @@ def client():
         yield client
         with app.app_context():
             db.drop_all()
+
+@pytest.fixture
+def mock_sns():
+    """Mock AWS SNS client."""
+    with patch('boto3.client') as mock_boto_client:
+        mock_client = MagicMock()
+        mock_boto_client.return_value = mock_client
+        yield mock_client
 
 def test_create_user(client):
     """Test user creation and verification email."""
